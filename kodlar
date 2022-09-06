@@ -1,0 +1,721 @@
+<?php
+ini_set("display_errors",1);
+Class Modul
+{
+    //Kullanıcı Tanımlamaları
+    public $kullanici_adi =60520100599; // Finans Tarafından Size Verilen Kullanıcı Adı
+    public $sifre ="12345678aB";        // Finans Tarafından Size Verilen Şifre
+    public $servis_url ="https://erpefaturatest.cs.com.tr:8443/efatura/ws/connectorService?wsdl";
+    public $erp_kodu ="KRC30981";
+    //Kullanıcı Tanımlamaları
+    function soapHeader($user, $password)
+    {
+        // Soap header her fonksiyona dahil edilip çağrılması gerekiyor
+        $tm_created = gmdate('Y-m-d\TH:i:s\Z');
+        $tm_expires = gmdate('Y-m-d\TH:i:s\Z', gmdate('U') + 180);
+
+        $simple_nonce = mt_rand();
+        $encoded_nonce = base64_encode($simple_nonce);
+
+        $passdigest = base64_encode(sha1($simple_nonce . $tm_created . $password, true));
+
+        $ns_wsse = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd';
+        $ns_wsu = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd';
+        $password_type = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest';
+        $encoding_type = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary';
+
+        $root = new SimpleXMLElement('<root/>');
+
+        $security = $root->addChild('wsse:Security', null, $ns_wsse);
+
+        $timestamp = $security->addChild('wsu:Timestamp', null, $ns_wsu);
+        $timestamp->addAttribute('wsu:Id', 'Timestamp-28');
+        $timestamp->addChild('wsu:Created', $tm_created, $ns_wsu);
+        $timestamp->addChild('wsu:Expires', $tm_expires, $ns_wsu);
+
+
+        $usernameToken = $security->addChild('wsse:UsernameToken', null, $ns_wsse);
+        $usernameToken->addChild('wsse:Username', $user, $ns_wsse);
+        $usernameToken->addChild('wsse:Password', $password, $ns_wsse)->addAttribute('Type', $password_type);
+        $usernameToken->addChild('wsse:Nonce', $encoded_nonce, $ns_wsse)->addAttribute('EncodingType', $encoding_type);
+        $usernameToken->addChild('wsu:Created', $tm_created, $ns_wsu);
+
+        $root->registerXPathNamespace('wsse', $ns_wsse);
+        $full = $root->xpath('/root/wsse:Security');
+        $auth = $full[0]->asXML();
+
+        return new SoapHeader($ns_wsse, 'Security', new SoapVar($auth, XSD_ANYXML), true);
+    }
+    function uuid($prefix = '')
+    {
+        // Belge belgeGonderExt fonksiyonu için benzersiz uuid numarası oluşturur
+        $chars = md5(uniqid(mt_rand(), true));
+        $parts = [substr($chars,0,8), substr($chars,8,4), substr($chars,12,4), substr($chars,16,4),substr($chars,20,12)];
+        return $prefix .implode($parts,'-');
+    }
+    function efaturaKullanicisi()
+    {
+        //efaturaKullanicisi Metodu Eğer kayıtlı ise geriye true değilse false döndürür
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->efaturaKullanicisi (
+              array('vergiTcKimlikNo'           => '60520100599')
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function kontorBilgisiGetir()
+    {
+        $result = array();
+        //kontorBilgisiGetir Metodu Kayıtlı kontör miktarını geri döndürür kontör tipi ve kontör birimi alacağı değerler fonksiyon içinde yazılı
+        /*
+         * kontorTipi FATURA->"1", DEFTER->"2", KEP->"3", KEPSMS->"4", ARSIV->"5", ARSIVSMS->"6",IRSALIYE->“7”
+         * kontorBirimi ADET->"1", TL->"2", MB->"3"
+         */
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->kontorBilgisiGetir (
+              array('vknTckn'=>'60520100599',
+                    'kontorTipi'=>1,
+                    'kontorBirimi'=>1)
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function efaturaKullaniciBilgisi()
+    {
+        //efaturaKullaniciBilgisi Metodu E-Fatura kullanıcısının bilgilerini getirir
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->efaturaKullaniciBilgisi (
+              array('vergiTcKimlikNo'=>'60520100599')
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function faturaNoUret()
+    {
+        //faturaNoUret Metodu Girilen bilgilerle fatura no üretir fatura kodu Fatura seri numarasını ifade eder. en az 3 karakter olmalıdır
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->faturaNoUret (
+              array('vknTckn'=>'60520100599',
+                    'faturaKodu'=>'123')
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function belgeGonderExt()
+    {
+        //belgeGonderExt Metodu Belge gönderen metoddur fonksiyon belgeOid isminde bir değişken döndürür bunu saklayınız daha sonra gidenBelgeDurumSorgulaExt metodunda bu parametre ile durum sorgulaması yapılacak
+
+        /*
+        * belgeTuru =>FATURA, UYGULAMA_YANITI,FATURA_UBL,UYGULAMA_YANITI_UBL,IRSALIYE,IRSALIYE_YANITI,IRSALIYE_UBL,IRSALIYE_YANITI_UBL
+        * veri = 'XML data olarak gönderilmelidir';
+        */
+        $file = '
+        <?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="general.xslt"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xsi:schemaLocation="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2 ..\xsdrt\maindoc\UBL-Invoice-2.1.xsd" xmlns:n4="http://www.altova.com/samplexml/other-namespace" >
+	<ext:UBLExtensions>
+		<ext:UBLExtension>
+			<ext:ExtensionContent>
+				<n4:auto-generated_for_wildcard/>
+			</ext:ExtensionContent>
+		</ext:UBLExtension>
+	</ext:UBLExtensions>
+	<cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+	<cbc:CustomizationID>TR1.2</cbc:CustomizationID>
+	<cbc:ProfileID>TICARIFATURA</cbc:ProfileID>
+	<cbc:ID>GIB2009000000011</cbc:ID>
+	<cbc:CopyIndicator>false</cbc:CopyIndicator>
+	<cbc:UUID>F47AC10B-58CC-4372-A567-0E02B2C3D479</cbc:UUID>
+	<cbc:IssueDate>2009-01-05</cbc:IssueDate>
+	<cbc:IssueTime>14:42:00</cbc:IssueTime>
+	<cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
+	<cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
+	<cbc:LineCountNumeric>8</cbc:LineCountNumeric>
+	<cac:DespatchDocumentReference>
+		<cbc:ID>180921</cbc:ID>
+		<cbc:IssueDate>2009-01-02</cbc:IssueDate>
+	</cac:DespatchDocumentReference>
+	<cac:Signature>
+		<cbc:ID schemeID="VKN_TCKN">1288331521</cbc:ID>
+		<cac:SignatoryParty>
+			<cac:PartyIdentification>
+				<cbc:ID schemeID="VKN">1288331521</cbc:ID>
+			</cac:PartyIdentification>
+			<cac:PostalAddress>
+				<cbc:StreetName>Papatya Caddesi Yasemin Sokak</cbc:StreetName>
+				<cbc:BuildingNumber>21</cbc:BuildingNumber>
+				<cbc:CitySubdivisionName>Beşiktaş</cbc:CitySubdivisionName>
+				<cbc:CityName>İstanbul</cbc:CityName>
+				<cbc:PostalZone>34100</cbc:PostalZone>
+				<cac:Country>
+					<cbc:Name>Türkiye</cbc:Name>
+				</cac:Country>
+			</cac:PostalAddress>
+		</cac:SignatoryParty>
+		<cac:DigitalSignatureAttachment>
+			<cac:ExternalReference>
+				<cbc:URI>#Signature</cbc:URI>
+			</cac:ExternalReference>
+		</cac:DigitalSignatureAttachment>
+	</cac:Signature>
+ 	<cac:AccountingSupplierParty>
+		<cac:Party>
+			<cbc:WebsiteURI>http://www.aaa.com.tr/</cbc:WebsiteURI>
+			<cac:PartyIdentification>
+				<cbc:ID schemeID="VKN">1288331521</cbc:ID>
+			</cac:PartyIdentification>
+			<cac:PartyName>
+				<cbc:Name>AAA Anonim Şirketi</cbc:Name>
+			</cac:PartyName>
+			<cac:PostalAddress>
+				<cbc:ID>1234567890</cbc:ID>
+				<cbc:StreetName>Papatya Caddesi Yasemin Sokak</cbc:StreetName>
+				<cbc:BuildingNumber>21</cbc:BuildingNumber>
+				<cbc:CitySubdivisionName>Beşiktaş</cbc:CitySubdivisionName>
+				<cbc:CityName>İstanbul</cbc:CityName>
+				<cbc:PostalZone>34100</cbc:PostalZone>
+				<cac:Country>
+					<cbc:Name>Türkiye</cbc:Name>
+				</cac:Country>
+			</cac:PostalAddress>
+			<cac:PartyTaxScheme>
+				<cac:TaxScheme>
+					<cbc:Name>Büyük Mükellefler</cbc:Name>
+				</cac:TaxScheme>
+			</cac:PartyTaxScheme>
+			<cac:Contact>
+				<cbc:Telephone>(212) 925 51515</cbc:Telephone>
+				<cbc:Telefax>(212) 925505015</cbc:Telefax>
+				<cbc:ElectronicMail>aa@aaa.com.tr</cbc:ElectronicMail>
+			</cac:Contact>
+		</cac:Party>
+	</cac:AccountingSupplierParty>
+	<cac:AccountingCustomerParty>
+		<cac:Party>
+			<cbc:WebsiteURI>http://www.bbb.com.tr/</cbc:WebsiteURI>
+			<cac:PartyIdentification>
+				<cbc:ID schemeID="VKN">9205121120</cbc:ID>
+			</cac:PartyIdentification>
+			<cac:PartyName>
+				<cbc:Name>BBB Limited  Şirketi</cbc:Name>
+			</cac:PartyName>
+			<cac:PostalAddress>
+				<cbc:ID>1234567890</cbc:ID>
+				<cbc:StreetName>Ihlamur Mahallesi Selvi Caddesi Sedir Sokak</cbc:StreetName>
+				<cbc:BuildingNumber>75/A</cbc:BuildingNumber>
+				<cbc:CitySubdivisionName>Kızılay</cbc:CitySubdivisionName>
+				<cbc:CityName>Ankara</cbc:CityName>
+				<cbc:PostalZone>06100</cbc:PostalZone>
+				<cac:Country>
+					<cbc:Name>Türkiye</cbc:Name>
+				</cac:Country>
+			</cac:PostalAddress>
+			<cac:PartyTaxScheme>
+				<cac:TaxScheme>
+					<cbc:Name>Çankaya</cbc:Name>
+				</cac:TaxScheme>
+			</cac:PartyTaxScheme>
+			<cac:Contact>
+				<cbc:Telephone>(312) 621 1111</cbc:Telephone>
+				<cbc:Telefax>(312) 621 1010</cbc:Telefax>
+				<cbc:ElectronicMail>bb@bbb.com.tr</cbc:ElectronicMail>
+			</cac:Contact>
+		</cac:Party>
+	</cac:AccountingCustomerParty>
+	<cac:PaymentMeans>
+		<cbc:PaymentMeansCode>1</cbc:PaymentMeansCode>
+		<cac:PayeeFinancialAccount>
+			<cbc:ID>5652214414</cbc:ID>
+			<cbc:CurrencyCode>TRY</cbc:CurrencyCode>
+			<cbc:PaymentNote>RRR Bankası Beşiktaş Şubesi TL Hesabı</cbc:PaymentNote>
+		</cac:PayeeFinancialAccount>
+	</cac:PaymentMeans>
+	<cac:PaymentTerms>
+		<cbc:Note>Fatura düzenlenme tarihinden itibaren 20 gün içerisinde ödenecektir.</cbc:Note>
+		<cbc:PaymentDueDate>2008-11-25</cbc:PaymentDueDate>
+	</cac:PaymentTerms>
+	<cac:TaxTotal>
+		<cbc:TaxAmount currencyID="TRY">4538.97</cbc:TaxAmount>
+		<cac:TaxSubtotal>
+			<cbc:TaxableAmount currencyID="TRY">25216.50</cbc:TaxableAmount>
+			<cbc:TaxAmount currencyID="TRY">4538.97</cbc:TaxAmount>
+			<cbc:CalculationSequenceNumeric>1.0</cbc:CalculationSequenceNumeric>
+			<cbc:Percent>18</cbc:Percent>
+			<cac:TaxCategory>
+				<cac:TaxScheme>
+					<cbc:Name>Katma Değer Vergisi</cbc:Name>
+					<cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+				</cac:TaxScheme>
+			</cac:TaxCategory>
+		</cac:TaxSubtotal>
+	</cac:TaxTotal>
+	<cac:LegalMonetaryTotal>
+		<cbc:LineExtensionAmount currencyID="TRY">26003.40</cbc:LineExtensionAmount>
+		<cbc:TaxExclusiveAmount currencyID="TRY">25216.50</cbc:TaxExclusiveAmount>
+		<cbc:TaxInclusiveAmount currencyID="TRY">29755.47</cbc:TaxInclusiveAmount>
+		<cbc:AllowanceTotalAmount currencyID="TRY">786.90 </cbc:AllowanceTotalAmount>
+		<cbc:PayableAmount currencyID="TRY">29755.47</cbc:PayableAmount>
+	</cac:LegalMonetaryTotal>
+    <cac:InvoiceLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="NIU">12</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">9410.7</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.05</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">495.3</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">9906</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">1693.93</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">9410.7</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">1693.93</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>Masa Üstü Bilgisayar</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">825.5</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>2</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="NIU">8</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">9428.4</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.03</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">291.6</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">9720</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">1697.11</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">9428.4</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">1697.11</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>Notebook Bilgisayar</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">1215</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>3</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="NIU">18</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">688.5</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.0</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">0</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">688.5</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">123.93</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">688.5</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">123.93</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>Notebook Çantası</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">38.25</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>4</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="NIU">13</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">1576.9</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.0</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">0</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">1576.9</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">283.84</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">1576.9</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">283.84</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>Yazıcı </cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">121.3</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>5</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="BX">200</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">1400</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.0</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">0</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">1400</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">252</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">1400</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">252</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>CD-R 2*56</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">7</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>6</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="BX">200</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">2200</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.0</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">0</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">2200</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">396</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">2200</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">396</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>DVD-R</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">11</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>7</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="NIU">80</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">340</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.0</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">0</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">340</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">61.2</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">340</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">61.2</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>Dolma Kalem</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">4.25</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    <cac:InvoiceLine>
+        <cbc:ID>8</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="NIU">80</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="TRY">172</cbc:LineExtensionAmount>
+        <cac:AllowanceCharge>
+            <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+            <cbc:MultiplierFactorNumeric>0.0</cbc:MultiplierFactorNumeric>
+            <cbc:Amount currencyID="TRY">0</cbc:Amount>
+            <cbc:BaseAmount currencyID="TRY">172</cbc:BaseAmount>
+        </cac:AllowanceCharge>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="TRY">30.96</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxableAmount currencyID="TRY">172</cbc:TaxableAmount>
+                <cbc:TaxAmount currencyID="TRY">30.96</cbc:TaxAmount>
+                <cbc:Percent>18</cbc:Percent>
+                <cac:TaxCategory>
+                    <cac:TaxScheme>
+                        <cbc:Name>KDV</cbc:Name>
+                        <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Name>Tükenmez Kalem</cbc:Name>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="TRY">2.15</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+</Invoice>
+';
+        $hash = md5($file);
+
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->belgeGonderExt(array('parametreler'=>
+                                  array('belgeNo' => $this->uuid(),
+                                        'vergiTcKimlikNo'           => '60520100599',
+                                        'belgeTuru'             => 'FATURA_UBL',
+                                        'veri'                      => $file,
+                                        'belgeHash'                 => md5($file),
+                                        'mimeType'                  => 'application/xml',
+                                        'belgeVersiyon'             => '1.2',
+                                        'erpKodu'=>$this->erp_kodu
+                                  )));
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function gidenBelgeDurumSorgulaExt()
+    {
+        //gidenBelgeDurumSorgulaExt  belgeGonderExt metodunun geri döndürdüğü belgeOid parametresi ile sorgulama yapmak için kullanılır
+        /*
+           * belgeNoTipi biz oid ile sorguladığımız için OID olmalı alabileceği diğer parametreler: YEREL,OID,ETTN,Varsayılan YEREL
+           * belgeNo  belgeGonderExt fonlsiyonundan dönen belgeOid olmalı
+        */
+
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->gidenBelgeDurumSorgulaExt (
+              array('vergiTcKimlikNo'=>'60520100599',
+                    'parametreler'=>
+                      array('belgeNoTipi'=>'OID',
+                            'belgeNo'=> '123',
+                            'donusTipiVersiyon'=>'2.0'
+                      ))
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function GelenBelgeleriAlExt()
+    {
+
+        /*
+           * belgeTuru alanına girilebilecek değerler :FATURA, UYGULAMA_YANITI, IRSALIYE VE IRSALIYE_YANITI
+           * belgeFormati alanına girilebilecek değerler :"UBL", "HTML", "PDF"
+           * onAlinanBelgeSiraNumarasi bir defada 100 belge çekilebilir. Bu parametre girilirse girilen parametreden sonraki 100 belge verilir Örnek : 0 girilirse 0 dan sonraki 100
+           * onayDurum Çekilecek belgelerin onay durumuna göre filtre yapmanızı sağlar alabileceği parametreler ONAYBEKLEYEN”, “ONAYLANAN”, “HEPSI”
+           * gelisTarihiBaslangic = "20131220000000000";      // YYYYAAGGSSDDssMMM (YılAyGünSaatDakikaSaniyeSalise)
+           * gelisTarihiBitis = "20140923000000000";          // YYYYAAGGSSDDssMMM (YılAyGünSaatDakikaSaniyeSalise)
+           * faturaTarihiBaslangic = "20131220000000000";     // YYYYAAGGSSDDssMMM (YılAyGünSaatDakikaSaniyeSalise)
+           * faturaTarihiBitis = "20140923000000000";         // YYYYAAGGSSDDssMMM (YılAyGünSaatDakikaSaniyeSalise)
+        */
+
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->GelenBelgeleriAlExt  (
+              array('vergiTcKimlikNo'=>'60520100599',
+                    'parametreler'=>array(
+                      'vergiTcKimlikNo'=>'60520100599',
+                      'belgeTuru'=>'FATURA',
+                      'belgeFormati'=>'PDF',
+                      'onAlinanBelgeSiraNumarasi'=>0,
+                      'onayDurum'=> 'HEPSI',
+                      'gelisTarihiBaslangic'=> '20131220000000000',
+                      'gelisTarihiBitis'=> '20140923000000000',
+                      'erpKodu'=>$this->erp_kodu
+                    )
+
+
+              )
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+    function belgelerAlindi()
+    {
+        //belgeTuru =>FATURA, UYGULAMA_YANITI,FATURA_UBL,UYGULAMA_YANITI_UBL,IRSALIYE,IRSALIYE_YANITI,IRSALIYE_UBL,IRSALIYE_YANITI_UBL
+        /*
+         * Geri dönüş değeri ettn listesindeki tüm belgelerin durumlarının başarıyla güncellenmesi halindeboştur (void).
+         */
+        $result = array();
+        try
+        {
+            $client = new SoapClient($this->servis_url);
+            $client->__setSoapHeaders($this->soapHeader($this->kullanici_adi,$this->sifre));
+            $sonuc = $client->belgelerAlindi (
+              array('vergiTcKimlikNo'=>'60520100599',
+                    'ettn'=>'123',
+                    'belgeTuru'=>'FATURA')
+            );
+            // Eğer soap hata döndürmezse
+            $result['status']="success";
+            $result['result']=$sonuc->return;
+            // Eğer soap hata döndürmezse
+        }
+        catch(Exception $e)
+        {
+            // Eğer soap hata döndürürse
+            $result['status']="error";
+            $result['error_messsage']=$e->getMessage();
+            // Eğer soap hata döndürürse
+        }
+        return $result;
+    }
+}
+$modul = new Modul();
+?>
+<pre>
+    <?php
+    print_r($modul->belgelerAlindi())
+    ?>
+</pre>
+<?php
